@@ -33,14 +33,14 @@ func main() {
 	signal.Notify(sigsCh, os.Interrupt, os.Kill)
 	defer close(sigsCh)
 
-	filesCh := make(chan string, 1)
+	filesCh := make(chan string)
 	defer close(filesCh)
 
-	errsCh := make(chan error, 1)
+	errsCh := make(chan error)
 	defer close(errsCh)
 
-	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(context.Background())
 
 	wg.Add(1)
 	go find(ctx, wg, filesCh, errsCh, *file, *dir)
