@@ -1,4 +1,4 @@
-# File searcher 
+# File search
 
 ### Compilation
 ![image](https://github.com/Borislavv/go-file-searcher/assets/50691459/d5c50a52-c6a2-4332-834c-ac6353e1a1bc)
