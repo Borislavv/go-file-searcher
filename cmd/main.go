@@ -26,7 +26,7 @@ var (
 func main() {
 	flag.Parse()
 	if *file == "" {
-		log.Fatalln("file cannot be empty or omitted")
+		log.Fatalln("error: file cannot be empty or omitted")
 	}
 
 	sigsCh := make(chan os.Signal, 1)
@@ -56,7 +56,7 @@ func main() {
 	go func() {
 		for e := range errsCh {
 			if *isErrs {
-				log.Printf("%v%v%v", red, e, reset)
+				log.Printf("%verror: %v%v", red, e, reset)
 			}
 		}
 	}()
