@@ -56,7 +56,7 @@ func main() {
 	go func() {
 		for e := range errsCh {
 			if *isErrs {
-				log.Printf("%verror: %v%v", red, e, reset)
+				log.Printf("%verror: %v%v\n", red, e, reset)
 			}
 		}
 	}()
