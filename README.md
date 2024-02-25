@@ -13,7 +13,8 @@
 ![image](https://github.com/Borislavv/go-file-searcher/assets/50691459/13175083-ec22-4ccd-8f29-d927174deb36)
 
 ### Installation (make the app available from anywhere in your linux system)
-![image](https://github.com/Borislavv/go-file-searcher/assets/50691459/d4b24f85-df15-44b3-bdac-dad9aefc0a9b)
+![image](https://github.com/Borislavv/go-file-searcher/assets/50691459/99f26296-46bb-473f-b5ab-2ae5cb648529)
+
 
 
 
