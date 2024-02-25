@@ -91,6 +91,10 @@ func find(
 		}
 
 		for _, dirEntry := range dirEntries {
+			if dirEntry.Name() == file {
+				filesCh <- dir + dirSeparator + dirEntry.Name()
+			}
+
 			if dirEntry.IsDir() {
 				var intoDir = dir
 				if dir == dirSeparator {
@@ -101,10 +105,6 @@ func find(
 
 				wg.Add(1)
 				go find(ctx, wg, filesCh, errsCh, file, intoDir)
-			} else {
-				if dirEntry.Name() == file {
-					filesCh <- dir + dirSeparator + dirEntry.Name()
-				}
 			}
 		}
 	}
