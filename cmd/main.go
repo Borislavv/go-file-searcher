@@ -3,15 +3,13 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 )
 
-const DirSeparator = string(os.PathSeparator)
+const dirSeparator = string(os.PathSeparator)
 
 const (
 	red   = "\033[31m"
@@ -20,44 +18,15 @@ const (
 )
 
 var (
-	dir        = flag.String("dir", ".", "Directory in which the search will be performed")
-	file       = flag.String("file", "", "Target file name for search")
-	extension  = flag.String("extensions", "", "Target file extensions separated by comma")
-	extensions []string
+	dir    = flag.String("dir", ".", "Directory in which the search will be performed")
+	file   = flag.String("file", "", "Target file name for search")
+	isErrs = flag.Bool("errs", true, "Determines whether errors should be displayed")
 )
 
-type Config struct {
-	dir        string
-	file       string
-	extensions []string
-}
-
-func parseCfg() (*Config, error) {
-	flag.Parse()
-
-	if *file == "" {
-		return nil, fmt.Errorf("file cannot be empty or omitted")
-	}
-
-	if *extension != "" {
-		for _, v := range strings.Split(*extension, ",") {
-			if ext := strings.TrimSpace(v); ext != "" {
-				extensions = append(extensions, ext)
-			}
-		}
-	}
-
-	return &Config{
-		dir:        *dir,
-		file:       *file,
-		extensions: extensions,
-	}, nil
-}
-
 func main() {
-	cfg, err := parseCfg()
-	if err != nil {
-		log.Fatalln(err)
+	flag.Parse()
+	if *file == "" {
+		log.Fatalln("file cannot be empty or omitted")
 	}
 
 	sigsCh := make(chan os.Signal, 1)
@@ -74,30 +43,30 @@ func main() {
 	wg := &sync.WaitGroup{}
 
 	wg.Add(1)
-	go find(ctx, wg, filesCh, errsCh, cfg.file, cfg.dir)
+	go find(ctx, wg, filesCh, errsCh, *file, *dir)
 
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-
 		i := 1
-		for {
-			select {
-			case <-sigsCh:
-				log.Println("OS signal had been caught, interrupting...")
-				return
-			case <-ctx.Done():
-				return
-			case f := <-filesCh:
-				log.Printf("%v#%d: %v%v\n", green, i, f, reset)
-				i++
-			case e := <-errsCh:
+		for f := range filesCh {
+			log.Printf("%v#%d: %v%v\n", green, i, f, reset)
+			i++
+		}
+	}()
+
+	go func() {
+		for e := range errsCh {
+			if *isErrs {
 				log.Printf("%v%v%v", red, e, reset)
 			}
 		}
 	}()
 
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		sigsCh <- os.Interrupt
+	}()
+
+	<-sigsCh
 	cancel()
 }
 
@@ -124,17 +93,17 @@ func find(
 		for _, dirEntry := range dirEntries {
 			if dirEntry.IsDir() {
 				var intoDir = dir
-				if dir == DirSeparator {
+				if dir == dirSeparator {
 					intoDir += dirEntry.Name()
 				} else {
-					intoDir = dir + DirSeparator + dirEntry.Name()
+					intoDir = dir + dirSeparator + dirEntry.Name()
 				}
 
 				wg.Add(1)
 				go find(ctx, wg, filesCh, errsCh, file, intoDir)
 			} else {
 				if dirEntry.Name() == file {
-					filesCh <- dir + DirSeparator + dirEntry.Name()
+					filesCh <- dir + dirSeparator + dirEntry.Name()
 				}
 			}
 		}
