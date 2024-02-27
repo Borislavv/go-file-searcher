@@ -9,7 +9,10 @@ import (
 	"sync"
 )
 
-const dirSeparator = string(os.PathSeparator)
+const (
+	pathSeparator = string(os.PathSeparator)
+	rootDirectory = pathSeparator
+)
 
 const (
 	red   = "\033[31m"
@@ -70,14 +73,7 @@ func main() {
 	cancel()
 }
 
-func find(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	filesCh chan<- string,
-	errsCh chan<- error,
-	file string,
-	dir string,
-) {
+func find(ctx context.Context, wg *sync.WaitGroup, fCh chan<- string, eCh chan<- error, file, dir string) {
 	defer wg.Done()
 
 	select {
@@ -86,25 +82,25 @@ func find(
 	default:
 		dirEntries, err := os.ReadDir(dir)
 		if err != nil {
-			errsCh <- err
+			eCh <- err
 			return
 		}
 
 		for _, dirEntry := range dirEntries {
 			if dirEntry.Name() == file {
-				filesCh <- dir + dirSeparator + dirEntry.Name()
+				fCh <- dir + pathSeparator + dirEntry.Name()
 			}
 
 			if dirEntry.IsDir() {
 				var intoDir = dir
-				if dir == dirSeparator {
+				if dir == rootDirectory {
 					intoDir += dirEntry.Name()
 				} else {
-					intoDir = dir + dirSeparator + dirEntry.Name()
+					intoDir = dir + pathSeparator + dirEntry.Name()
 				}
 
 				wg.Add(1)
-				go find(ctx, wg, filesCh, errsCh, file, intoDir)
+				go find(ctx, wg, fCh, eCh, file, intoDir)
 			}
 		}
 	}
