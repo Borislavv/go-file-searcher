@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
+	"time"
 )
 
 const (
@@ -24,12 +27,20 @@ var (
 	dir    = flag.String("dir", ".", "Directory in which the search will be performed")
 	file   = flag.String("file", "", "Target file name for search")
 	isErrs = flag.Bool("errs", true, "Determines whether errors should be displayed")
+	cpu    = flag.Uint("cpu", 0, "Max number of CPU to use (if value is 0 (zero) then will used max)")
 )
 
 func main() {
+	s := time.Now()
+	defer func() { fmt.Printf("Elapsed: %v", time.Since(s)) }()
+
 	flag.Parse()
 	if *file == "" {
 		log.Fatalln("error: file cannot be empty or omitted")
+	}
+
+	if *cpu != 0 {
+		runtime.GOMAXPROCS(int(*cpu))
 	}
 
 	sigsCh := make(chan os.Signal, 1)
@@ -51,7 +62,7 @@ func main() {
 	go func() {
 		i := 1
 		for f := range filesCh {
-			log.Printf("%v#%d: %v%v\n", green, i, f, reset)
+			_, _ = fmt.Fprintf(os.Stdout, "%v#%d: %v%v\n", green, i, f, reset)
 			i++
 		}
 	}()
@@ -59,7 +70,7 @@ func main() {
 	go func() {
 		for e := range errsCh {
 			if *isErrs {
-				log.Printf("%verror: %v%v\n", red, e, reset)
+				_, _ = fmt.Fprintf(os.Stderr, "%verror: %v%v\n", red, e, reset)
 			}
 		}
 	}()
@@ -96,7 +107,7 @@ func find(ctx context.Context, wg *sync.WaitGroup, fCh chan<- string, eCh chan<-
 				if dir == rootDirectory {
 					intoDir += dirEntry.Name()
 				} else {
-					intoDir = dir + pathSeparator + dirEntry.Name()
+					intoDir += pathSeparator + dirEntry.Name()
 				}
 
 				wg.Add(1)
