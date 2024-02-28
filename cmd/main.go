@@ -67,13 +67,13 @@ func main() {
 		}
 	}()
 
-	go func() {
-		for e := range errsCh {
-			if *isErrs {
+	if *isErrs {
+		go func() {
+			for e := range errsCh {
 				_, _ = fmt.Fprintf(os.Stderr, "%verror: %v%v\n", red, e, reset)
 			}
-		}
-	}()
+		}()
+	}
 
 	go func() {
 		wg.Wait()
