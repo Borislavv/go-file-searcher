@@ -93,7 +93,9 @@ func find(ctx context.Context, wg *sync.WaitGroup, fCh chan<- string, eCh chan<-
 	default:
 		dirEntries, err := os.ReadDir(dir)
 		if err != nil {
-			eCh <- err
+			if *isErrs {
+				eCh <- err
+			}
 			return
 		}
 
