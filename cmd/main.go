@@ -106,7 +106,9 @@ func find(ctx context.Context, wg *sync.WaitGroup, fCh chan<- string, eCh chan<-
 
 			info, err := dirEntry.Info()
 			if err != nil {
-				eCh <- err
+				if *isErrs {
+					eCh <- err
+				}
 				continue
 			}
 
