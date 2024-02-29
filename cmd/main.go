@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"regexp"
 	"runtime"
 	"sync"
 	"time"
@@ -28,6 +29,11 @@ var (
 	file   = flag.String("file", "", "Target file name for search")
 	isErrs = flag.Bool("errs", true, "Determines whether errors should be displayed")
 	cpu    = flag.Uint("cpu", 0, "Max number of CPU to use (if value is 0 (zero) then will used max)")
+	rgx    = flag.Bool("rgx", false, "If true, then file must contains a valid regex.")
+)
+
+var (
+	regExpr *regexp.Regexp = nil
 )
 
 func main() {
@@ -35,8 +41,15 @@ func main() {
 	defer func() { fmt.Printf("Elapsed: %v", time.Since(s)) }()
 
 	flag.Parse()
+
 	if *file == "" {
-		log.Fatalln("error: file cannot be empty or omitted")
+		log.Println("error: file cannot be empty or omitted")
+		return
+	}
+	if *rgx {
+		regExpr, err := regexp.Compile(*file)
+		log.Println(err)
+		return
 	}
 
 	if *cpu != 0 {
@@ -100,20 +113,23 @@ func find(ctx context.Context, wg *sync.WaitGroup, fCh chan<- string, eCh chan<-
 		}
 
 		for _, dirEntry := range dirEntries {
-			if dirEntry.Name() == file {
+			if regExpr != nil {
+				if regExpr.MatchString(dirEntry.Name()) {
+					fCh <- dir + pathSeparator + dirEntry.Name()
+				}
+			} else if dirEntry.Name() == file {
 				fCh <- dir + pathSeparator + dirEntry.Name()
 			}
 
-			info, err := dirEntry.Info()
-			if err != nil {
+			if info, err := dirEntry.Info(); err != nil {
 				if *isErrs {
 					eCh <- err
 				}
 				continue
-			}
-
-			if info.Size() == 0 {
-				continue
+			} else {
+				if info.Size() == 0 {
+					continue
+				}
 			}
 
 			if dirEntry.IsDir() {
