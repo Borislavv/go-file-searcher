@@ -102,6 +102,16 @@ func find(ctx context.Context, wg *sync.WaitGroup, fCh chan<- string, eCh chan<-
 				fCh <- dir + pathSeparator + dirEntry.Name()
 			}
 
+			info, err := dirEntry.Info()
+			if err != nil {
+				eCh <- err
+				continue
+			}
+
+			if info.Size() == 0 {
+				continue
+			}
+
 			if dirEntry.IsDir() {
 				var intoDir = dir
 				if dir == rootDirectory {
