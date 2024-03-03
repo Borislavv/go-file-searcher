@@ -47,9 +47,12 @@ func main() {
 		return
 	}
 	if *rgx {
-		regExpr, err := regexp.Compile(*file)
-		log.Println(err)
-		return
+		regex, err := regexp.Compile(*file)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		regExpr = regex
 	}
 
 	if *cpu != 0 {
