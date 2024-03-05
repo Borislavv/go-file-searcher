@@ -136,12 +136,15 @@ func find(ctx context.Context, wg *sync.WaitGroup, fCh chan<- string, eCh chan<-
 			}
 
 			if dirEntry.IsDir() {
-				wg.Add(1)
+				var intoDir string
 				if dir == rootDirectory {
-					go find(ctx, wg, fCh, eCh, file, dir+dirEntry.Name())
+					intoDir = dir + dirEntry.Name()
 				} else {
-					go find(ctx, wg, fCh, eCh, file, dir+pathSeparator+dirEntry.Name())
+					intoDir = dir + pathSeparator + dirEntry.Name()
 				}
+
+				wg.Add(1)
+				go find(ctx, wg, fCh, eCh, file, intoDir)
 			}
 		}
 	}
