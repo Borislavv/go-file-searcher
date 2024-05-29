@@ -4,12 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"log"
 	"os"
 	"os/signal"
 	"regexp"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -34,6 +36,11 @@ var (
 
 var (
 	regExpr *regexp.Regexp = nil
+)
+
+// debug
+var (
+	active, deferred = atomic.Int64{}, atomic.Int64{}
 )
 
 func main() {
@@ -63,15 +70,17 @@ func main() {
 	signal.Notify(sigsCh, os.Interrupt, os.Kill)
 	defer close(sigsCh)
 
-	filesCh := make(chan string)
+	filesCh := make(chan string, 1000)
 	defer close(filesCh)
 
-	errsCh := make(chan error)
+	errsCh := make(chan error, 1000)
 	defer close(errsCh)
 
 	wg := &sync.WaitGroup{}
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
+	active.Add(1)
 	wg.Add(1)
 	go find(ctx, wg, filesCh, errsCh, *file, *dir)
 
@@ -96,42 +105,73 @@ func main() {
 		sigsCh <- os.Interrupt
 	}()
 
+	go func() {
+		t := time.NewTicker(time.Second)
+		defer t.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-sigsCh:
+				return
+			case <-t.C:
+				a := active.Load()
+				d := deferred.Load()
+				fmt.Printf("active: %d, deferred: %d, diff: %d\n", a, d, a-d)
+			}
+		}
+	}()
+
 	<-sigsCh
-	cancel()
 }
 
-func find(ctx context.Context, wg *sync.WaitGroup, fCh chan<- string, eCh chan<- error, file, dir string) {
-	defer wg.Done()
+func find(ctx context.Context, wg *sync.WaitGroup, filesCh chan<- string, errsCh chan<- error, file, dir string) {
+	defer func() {
+		deferred.Add(1)
+		wg.Done()
+	}()
 
 	select {
 	case <-ctx.Done():
 		return
 	default:
-		dirEntries, err := os.ReadDir(dir)
-		if err != nil {
+		dirEntries, readDirErr := os.ReadDir(dir)
+		if readDirErr != nil {
 			if *isErrs {
-				eCh <- err
+				errsCh <- readDirErr
 			}
 			return
 		}
 
 		for _, dirEntry := range dirEntries {
-			if regExpr != nil {
-				if regExpr.MatchString(dirEntry.Name()) {
-					fCh <- dir + pathSeparator + dirEntry.Name()
-				}
-			} else if dirEntry.Name() == file {
-				fCh <- dir + pathSeparator + dirEntry.Name()
+			if isSymlinkOrIrregular(dirEntry.Type()) {
+				continue
 			}
 
-			if info, err := dirEntry.Info(); err != nil {
+			info, infoErr := dirEntry.Info()
+			if infoErr != nil {
 				if *isErrs {
-					eCh <- err
+					errsCh <- infoErr
 				}
 				continue
 			} else {
 				if info.Size() == 0 {
 					continue
+				}
+			}
+
+			if !isReadable(dir + "/" + info.Name()) {
+				continue
+			}
+
+			if dirEntry.Type().IsRegular() {
+				if regExpr != nil {
+					if regExpr.MatchString(dirEntry.Name()) {
+						filesCh <- dir + pathSeparator + dirEntry.Name()
+					}
+				} else if dirEntry.Name() == file {
+					filesCh <- dir + pathSeparator + dirEntry.Name()
 				}
 			}
 
@@ -143,9 +183,24 @@ func find(ctx context.Context, wg *sync.WaitGroup, fCh chan<- string, eCh chan<-
 					intoDir = dir + pathSeparator + dirEntry.Name()
 				}
 
+				active.Add(1)
 				wg.Add(1)
-				go find(ctx, wg, fCh, eCh, file, intoDir)
+				go find(ctx, wg, filesCh, errsCh, file, intoDir)
 			}
 		}
 	}
+}
+
+func isReadable(path string) bool {
+	return unix.Access(path, unix.R_OK) == nil
+}
+
+func isSymlinkOrIrregular(mode os.FileMode) bool {
+	if mode.Type()&os.ModeSymlink != 0 {
+		return true
+	}
+	if mode.Type()&os.ModeIrregular != 0 {
+		return true
+	}
+	return false
 }
